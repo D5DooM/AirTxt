@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Peer-to-Peer Text Sender</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f9f9f9;
+        }
+
+        #app {
+            width: 400px;
+            background: #ffffff;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        textarea {
+            width: 100%;
+            height: 100px;
+            margin-bottom: 10px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        #send-btn {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+
+        #send-btn:hover {
+            background-color: #45a049;
+        }
+
+        #messages {
+            margin-top: 20px;
+            max-height: 200px;
+            overflow-y: auto;
+            text-align: left;
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 5px;
+            background: #f9f9f9;
+        }
+
+        .message {
+            margin: 5px 0;
+        }
+
+        .message.you {
+            color: blue;
+        }
+
+        .message.other {
+            color: green;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <h2>Peer-to-Peer Messaging</h2>
+        <label for="device-name">Your Device Name:</label>
+        <input type="text" id="device-name" placeholder="Enter device name" />
+        <textarea id="message-box" placeholder="Type your message here..."></textarea>
+        <button id="send-btn">Send</button>
+        <div id="messages"></div>
+    </div>
+
+    <script>
+        const sendBtn = document.getElementById("send-btn");
+        const messageBox = document.getElementById("message-box");
+        const messagesDiv = document.getElementById("messages");
+        const deviceNameInput = document.getElementById("device-name");
+
+        let localConnection, remoteConnection, sendChannel, receiveChannel;
+
+        // Create WebRTC connections
+        function setupConnection() {
+            localConnection = new RTCPeerConnection();
+            sendChannel = localConnection.createDataChannel("messaging");
+
+            sendChannel.onopen = () => console.log("Connection open");
+            sendChannel.onclose = () => console.log("Connection closed");
+
+            localConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    console.log("Local ICE candidate:", event.candidate);
+                    remoteConnection.addIceCandidate(event.candidate);
+                }
+            };
+
+            // Remote connection setup
+            remoteConnection = new RTCPeerConnection();
+            remoteConnection.ondatachannel = (event) => {
+                receiveChannel = event.channel;
+                receiveChannel.onmessage = (e) => {
+                    const messageData = JSON.parse(e.data);
+                    addMessage(
+                        `${messageData.deviceName}: ${messageData.message}`,
+                        "other"
+                    );
+                };
+            };
+
+            remoteConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    console.log("Remote ICE candidate:", event.candidate);
+                    localConnection.addIceCandidate(event.candidate);
+                }
+            };
+        }
+
+        // Exchange offer/answer between peers
+        async function connectPeers() {
+            const offer = await localConnection.createOffer();
+            await localConnection.setLocalDescription(offer);
+            console.log("Offer:", offer);
+
+            await remoteConnection.setRemoteDescription(offer);
+            const answer = await remoteConnection.createAnswer();
+            await remoteConnection.setLocalDescription(answer);
+            console.log("Answer:", answer);
+
+            await localConnection.setRemoteDescription(answer);
+        }
+
+        // Add a message to the display
+        function addMessage(message, type) {
+            const messageElem = document.createElement("div");
+            messageElem.classList.add("message", type);
+            messageElem.textContent = message;
+            messagesDiv.appendChild(messageElem);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight; // Auto-scroll to the bottom
+        }
+
+        // Send message on button click
+        sendBtn.addEventListener("click", () => {
+            const message = messageBox.value.trim();
+            const deviceName = deviceNameInput.value.trim() || "Anonymous";
+
+            if (message && sendChannel.readyState === "open") {
+                const messageData = JSON.stringify({ message, deviceName });
+                sendChannel.send(messageData);
+                addMessage(`You: ${message}`, "you");
+                messageBox.value = "";
+            }
+        });
+
+        // Initialize the connection
+        setupConnection();
+        connectPeers();
+    </script>
+</body>
+</html>
