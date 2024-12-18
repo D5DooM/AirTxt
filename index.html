@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Peer-to-Peer Text Sender</title>
+    <title>Peer-to-Peer Messaging</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -71,6 +71,25 @@
         .message.other {
             color: green;
         }
+
+        #device-list {
+            margin-top: 20px;
+            list-style-type: none;
+            padding: 0;
+        }
+
+        #device-list li {
+            padding: 10px;
+            border: 1px solid #ddd;
+            margin-bottom: 5px;
+            cursor: pointer;
+            background: #f1f1f1;
+            border-radius: 5px;
+        }
+
+        #device-list li:hover {
+            background: #e1e1e1;
+        }
     </style>
 </head>
 <body>
@@ -78,18 +97,36 @@
         <h2>Peer-to-Peer Messaging</h2>
         <label for="device-name">Your Device Name:</label>
         <input type="text" id="device-name" placeholder="Enter device name" />
+        <button id="start-discovery">Start Discovery</button>
+        <ul id="device-list"></ul>
+        <hr>
         <textarea id="message-box" placeholder="Type your message here..."></textarea>
         <button id="send-btn">Send</button>
         <div id="messages"></div>
+        <hr>
+        <h3>Pairing Methods</h3>
+        <button id="generate-qr">Generate QR Code</button>
+        <canvas id="qrcode"></canvas>
+        <br>
+        <input type="text" id="short-code" placeholder="Enter short code" />
+        <button id="connect-short-code">Connect</button>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
     <script>
         const sendBtn = document.getElementById("send-btn");
         const messageBox = document.getElementById("message-box");
         const messagesDiv = document.getElementById("messages");
         const deviceNameInput = document.getElementById("device-name");
+        const startDiscoveryBtn = document.getElementById("start-discovery");
+        const deviceList = document.getElementById("device-list");
+        const generateQRBtn = document.getElementById("generate-qr");
+        const qrCodeCanvas = document.getElementById("qrcode");
+        const shortCodeInput = document.getElementById("short-code");
+        const connectShortCodeBtn = document.getElementById("connect-short-code");
 
         let localConnection, remoteConnection, sendChannel, receiveChannel;
+        const devices = new Map();  // Store discovered devices
 
         // Create WebRTC connections
         function setupConnection() {
@@ -160,6 +197,51 @@
                 sendChannel.send(messageData);
                 addMessage(`You: ${message}`, "you");
                 messageBox.value = "";
+            }
+        });
+
+        // Start discovery of nearby devices
+        startDiscoveryBtn.addEventListener("click", () => {
+            // Example using Web Bluetooth API to find nearby devices (for demo purposes)
+            navigator.bluetooth.requestDevice({ acceptAllDevices: true })
+                .then(device => {
+                    console.log("Found device: ", device.name);
+                    devices.set(device.id, device.name);
+                    updateDeviceList();
+                })
+                .catch(error => console.error("Error: ", error));
+        });
+
+        // Update the device list in the UI
+        function updateDeviceList() {
+            deviceList.innerHTML = "";
+            devices.forEach((name, id) => {
+                const listItem = document.createElement("li");
+                listItem.textContent = name;
+                listItem.addEventListener("click", () => {
+                    console.log(`Connecting to ${name}`);
+                    // Handle device selection and connection setup here
+                });
+                deviceList.appendChild(listItem);
+            });
+        }
+
+        // Generate a QR code with connection details
+        generateQRBtn.addEventListener("click", () => {
+            const deviceName = deviceNameInput.value.trim() || "Anonymous";
+            const connectionDetails = JSON.stringify({ deviceName, offer: localConnection.localDescription.sdp });
+            QRCode.toCanvas(qrCodeCanvas, connectionDetails, function (error) {
+                if (error) console.error(error);
+                console.log("QR code generated!");
+            });
+        });
+
+        // Connect using short code
+        connectShortCodeBtn.addEventListener("click", () => {
+            const shortCode = shortCodeInput.value.trim();
+            if (shortCode) {
+                console.log(`Connecting using short code: ${shortCode}`);
+                // Handle short code connection setup here
             }
         });
 
